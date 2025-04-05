@@ -1,7 +1,9 @@
 # JWTerm - Virtual Terminal Screen Emulator
 
+Currently in **WIP** status
+
 ## Description
-JWTerm is a basic virtual terminal screen emulator written in Java. It is intended for use in roguelike game development, providing a minimalistic and efficient way to render text-based screens. The emulator does not rely on any external libraries, using only Java's built-in Swing and AWT libraries. This makes it lightweight and easy to integrate into Java projects that require terminal-like interfaces.
+`JWTerm` is a basic virtual terminal screen emulator written in Java. It is intended for use in roguelike game development, providing a minimalistic and efficient way to render text-based screens. The emulator does not rely on any external libraries, using only Java's built-in Swing and AWT libraries. This makes it lightweight and easy to integrate into Java projects that require terminal-like interfaces.
 
 Currently, the emulator supports rendering basic characters using the Fixedsys font, offering a retro aesthetic for text-based games.
 
@@ -16,18 +18,8 @@ Currently, the emulator supports rendering basic characters using the Fixedsys f
    ```bash
    git clone https://github.com/yourusername/JWTerm.git
    ```
-2. Navigate to the project directory:
-   ```bash
-   cd JWTerm
-   ```
-3. Compile the application:
-   ```bash
-   javac src/com/jwterm/Main.java
-   ```
-4. Run the application:
-   ```bash
-   java com.jwterm.Main
-   ```
+2. Open project in IntelliJ Idea
+3. Run `JWTerm` configuration
 
 ## Usage
 JWTerm currently renders basic characters on a window, simulating a terminal screen. This can be used for developing roguelike games or any text-based applications that require a terminal interface.
