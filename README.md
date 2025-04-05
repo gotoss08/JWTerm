@@ -10,6 +10,8 @@ Currently, the emulator supports rendering basic characters using the **Fixedsys
 
 > **Note:** This project is still in early stages of development, and many features are yet to be implemented.
 
+One of the inspirations for JWTerm comes from the **AsciiPanel** project, which provides a simple, efficient way to render text-based panels for roguelike games. You can find more about AsciiPanel [here](https://github.com/trystan/AsciiPanel).
+
 ## Features
 
 - **Terminal Screen Emulation**: Simulates a virtual terminal window, ideal for roguelike games or any text-based applications.
@@ -62,3 +64,4 @@ Feel free to fork the repository, submit issues, and open pull requests. All con
 ## Acknowledgments
 
 - Fixedsys font by [Kika](https://github.com/kika/fixedsys).
+- Inspiration from the **AsciiPanel** project by [Trystan](https://github.com/trystan/AsciiPanel).
