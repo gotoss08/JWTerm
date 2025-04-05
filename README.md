@@ -17,7 +17,17 @@ One of the inspirations for JWTerm comes from the **AsciiPanel** project, which 
 - **Terminal Screen Emulation**: Simulates a virtual terminal window, ideal for roguelike games or any text-based applications.
 - **Fixedsys Font**: Uses the **Fixedsys** font for retro-style text rendering, enhancing the terminal-like experience.
 - **Lightweight**: Written purely in Java with no external dependencies, leveraging Swing and AWT for graphical components.
+- **Real-time** rendering using standard game loop principle.
+- **Resize window** support.
+- Basic input key handling.
 - **Open Source**: JWTerm is free and open-source under the **MIT License**, allowing modification and redistribution.
+
+## Planned
+
+- Mouse support
+- Camera system
+- API for better screen and text manipulation
+- Simple API for integration in any project
 
 ## Installation
 
