@@ -1,5 +1,6 @@
 package com.jwterm;
 
+import com.jwterm.buffer.TerminalBuffer;
 import com.jwterm.utils.Dimension;
 import com.jwterm.utils.LoggingUtility;
 import com.jwterm.utils.Padding;
@@ -11,8 +12,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -52,8 +51,7 @@ public class TermScreen {
     private final Padding screenPadding = new Padding();
 
     // Screen content
-    private Glyph[][] glyphs;
-    public final ReadWriteLock lock = new ReentrantReadWriteLock();
+    private TerminalBuffer buffer;
 
     /**
      * Creates a new TermScreen with default settings.
@@ -70,7 +68,7 @@ public class TermScreen {
     public TermScreen build() {
         calculateScreenDimensions();
         calculateScreenPadding();
-        initializeGlyphs();
+        initializeBuffer();
         return this;
     }
 
@@ -134,6 +132,11 @@ public class TermScreen {
      * @return this TermScreen instance for chaining
      */
     public TermScreen setScreenSize(int screenWidth, int screenHeight) {
+        if (screenWidth <= 0 || screenHeight <= 0) {
+            LOGGER.warning("Invalid screen dimensions: " + screenWidth + "x" + screenHeight);
+            return this;
+        }
+        
         screenSize.set(screenWidth, screenHeight);
         logTerminalScreenSize();
         return this;
@@ -141,9 +144,16 @@ public class TermScreen {
 
     /**
      * Recalculates all dimensions based on current settings.
+     * This should be called after changing screen size or font.
+     * 
      * @return this TermScreen instance for chaining
      */
     public TermScreen recalculateScreenDimensions() {
+        if (font == null) {
+            LOGGER.warning("Cannot recalculate dimensions: font not set");
+            return this;
+        }
+        
         calculateScreenDimensions();
         calculateScreenPadding();
         return this;
@@ -162,8 +172,9 @@ public class TermScreen {
         LOGGER.log(Level.FINE, "Terminal cols: " + cols);
         LOGGER.log(Level.FINE, "Terminal rows: " + rows);
 
-        initializeGlyphs();
-
+        if (buffer != null) {
+            buffer.resize(rows, cols);
+        }
     }
 
     private void calculateScreenPadding() {
@@ -177,8 +188,12 @@ public class TermScreen {
         screenPadding.setVertical(verticalPadding);
     }
 
-    private void initializeGlyphs() {
-        glyphs = new Glyph[dimension.getRows()][dimension.getCols()];
+    private void initializeBuffer() {
+        if (buffer == null) {
+            buffer = new TerminalBuffer(dimension.getRows(), dimension.getCols());
+        } else {
+            buffer.resize(dimension.getRows(), dimension.getCols());
+        }
     }
 
     /**
@@ -187,10 +202,8 @@ public class TermScreen {
      * @return this TermScreen instance for chaining
      */
     public TermScreen fill(Glyph glyph) {
-        for (int row = 0; row < dimension.getRows(); row++) {
-            for (int col = 0; col < dimension.getCols(); col++) {
-                glyphs[row][col] = glyph;
-            }
+        if (buffer != null) {
+            buffer.fill(glyph);
         }
         return this;
     }
@@ -201,11 +214,8 @@ public class TermScreen {
      * @return this TermScreen instance for chaining
      */
     public TermScreen outline(Glyph glyph) {
-        for (int row = 0; row < dimension.getRows(); row++) {
-            for (int col = 0; col < dimension.getCols(); col++) {
-                if (row == 0 || row == dimension.getRows() - 1 || col == 0 || col == dimension.getCols() - 1)
-                    glyphs[row][col] = glyph;
-            }
+        if (buffer != null) {
+            buffer.outline(glyph);
         }
         return this;
     }
@@ -218,8 +228,8 @@ public class TermScreen {
      * @return this TermScreen instance for chaining
      */
     public TermScreen setGlyph(int row, int col, Glyph glyph) {
-        if (row >= 0 && row < dimension.getRows() && col >= 0 && col < dimension.getCols()) {
-            glyphs[row][col] = glyph;
+        if (buffer != null) {
+            buffer.setGlyph(row, col, glyph);
         }
         return this;
     }
@@ -231,10 +241,30 @@ public class TermScreen {
      * @return the glyph at the specified position, or null if out of bounds
      */
     public Glyph getGlyph(int row, int col) {
-        if (row >= 0 && row < dimension.getRows() && col >= 0 && col < dimension.getCols()) {
-            return glyphs[row][col];
+        if (buffer != null) {
+            return buffer.getGlyph(row, col);
         }
         return null;
+    }
+
+    /**
+     * Executes a read operation with the buffer lock held.
+     * @param operation The operation to execute
+     */
+    public void withReadLock(Runnable operation) {
+        if (buffer != null) {
+            buffer.withReadLock(operation);
+        }
+    }
+
+    /**
+     * Executes a write operation with the buffer lock held.
+     * @param operation The operation to execute
+     */
+    public void withWriteLock(Runnable operation) {
+        if (buffer != null) {
+            buffer.withWriteLock(operation);
+        }
     }
 
     /**
@@ -242,25 +272,23 @@ public class TermScreen {
      * @param g the graphics context to render to
      */
     public void render(Graphics2D g) {
-        if (font == null || glyphs == null) {
-            LOGGER.log(Level.WARNING, "Cannot render: font or glyphs not initialized");
+        if (font == null || buffer == null) {
+            LOGGER.log(Level.WARNING, "Cannot render: font or buffer not initialized");
             return;
         }
 
         g.setFont(font);
-        lock.readLock().lock();
-        try {
-            for (int row = 0; row < dimension.getRows(); row++) {
-                for (int col = 0; col < dimension.getCols(); col++) {
-                    Glyph glyph = glyphs[row][col];
+        buffer.withReadLock(() -> {
+            Dimension bufferDim = buffer.getDimension();
+            for (int row = 0; row < bufferDim.getRows(); row++) {
+                for (int col = 0; col < bufferDim.getCols(); col++) {
+                    Glyph glyph = buffer.getGlyph(row, col);
                     if (glyph == null) continue;
 
                     renderGlyph(g, glyph, row, col);
                 }
             }
-        } finally {
-            lock.readLock().unlock();
-        }
+        });
     }
 
     /**
@@ -320,5 +348,21 @@ public class TermScreen {
      */
     public Size getScreenSize() {
         return screenSize;
+    }
+
+    /**
+     * Resizes the terminal screen to the specified dimensions.
+     * This is a convenience method that performs all necessary resize operations in a single call.
+     * 
+     * @param width the new width in pixels
+     * @param height the new height in pixels
+     * @return this TermScreen instance for chaining
+     */
+    public TermScreen resize(int width, int height) {
+        setScreenSize(width, height);
+        recalculateScreenDimensions();
+        fill(Glyph.SPACE);
+        outline(Glyph.WALL);
+        return this;
     }
 }

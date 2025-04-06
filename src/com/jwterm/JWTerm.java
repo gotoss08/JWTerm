@@ -1,6 +1,7 @@
 package com.jwterm;
 
 import com.jwterm.utils.LoggingUtility;
+import com.jwterm.utils.ResizeManager;
 import com.jwterm.utils.Timer;
 
 import javax.swing.*;
@@ -28,6 +29,7 @@ public abstract class JWTerm implements KeyListener {
     private final JFrame frame;
     private final Canvas canvas;
     private final BufferStrategy bufferStrategy;
+    private final ResizeManager resizeManager;
 
     // Terminal emulation
     protected final TermScreen termScreen;
@@ -65,6 +67,9 @@ public abstract class JWTerm implements KeyListener {
 
         // Initialize terminal
         termScreen = createTerminalEmulator();
+        
+        // Initialize resize manager
+        resizeManager = new ResizeManager(canvas, termScreen);
 
         // Display the window
         frame.setLocationRelativeTo(null);
@@ -112,14 +117,6 @@ public abstract class JWTerm implements KeyListener {
             @Override
             public void windowClosing(WindowEvent e) {
                 running = false;
-            }
-        });
-
-        // Handle window resizing
-        newFrame.addComponentListener(new ComponentAdapter() {
-            @Override
-            public void componentResized(ComponentEvent e) {
-                handleResize();
             }
         });
 
@@ -192,32 +189,6 @@ public abstract class JWTerm implements KeyListener {
                 .build()
                 .fill(TermScreen.Glyph.SPACE)
                 .outline(TermScreen.Glyph.WALL);
-    }
-
-    /**
-     * Handles window resize events.
-     */
-    private void handleResize() {
-        int width = canvas.getWidth();
-        int height = canvas.getHeight();
-
-        if (width <= 0 || height <= 0) {
-            return;
-        }
-
-        if (termScreen != null) {
-            termScreen.lock.writeLock().lock();
-            try {
-                termScreen.setScreenSize(width, height)
-                        .recalculateScreenDimensions()
-                        .fill(TermScreen.Glyph.SPACE)
-                        .outline(TermScreen.Glyph.WALL);
-            } finally {
-                termScreen.lock.writeLock().unlock();
-            }
-        }
-
-        LOGGER.fine("Resized to: " + width + "x" + height);
     }
 
     /**
@@ -350,6 +321,9 @@ public abstract class JWTerm implements KeyListener {
      */
     private void shutdown() {
         LOGGER.log(Level.INFO, "Shutting down application");
+        if (resizeManager != null) {
+            resizeManager.shutdown();
+        }
         frame.dispose();
         System.exit(0);
     }
