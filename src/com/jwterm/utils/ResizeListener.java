@@ -1,7 +1,9 @@
 package com.jwterm.utils;
 
 /**
- * Interface for components that need to be notified about resize events.
+ * Interface for classes that need to be notified of resize events.
+ * This interface is used by the ResizeManager to notify registered listeners
+ * when the terminal window has been resized.
  */
 public interface ResizeListener {
     
