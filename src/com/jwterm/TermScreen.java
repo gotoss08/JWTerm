@@ -1,17 +1,15 @@
 package com.jwterm;
 
 import com.jwterm.buffer.TerminalBuffer;
-import com.jwterm.utils.Dimension;
+import com.jwterm.font.FontManager;
+import com.jwterm.geometry.Dimension;
+import com.jwterm.geometry.Padding;
+import com.jwterm.geometry.Size;
+import com.jwterm.glyph.Glyph;
 import com.jwterm.utils.LoggingUtility;
-import com.jwterm.utils.Padding;
-import com.jwterm.utils.Size;
 
 import javax.swing.*;
 import java.awt.*;
-import java.io.File;
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -19,29 +17,8 @@ public class TermScreen {
 
     private static final Logger LOGGER = LoggingUtility.getLogger(TermScreen.class.getName());
 
-    /**
-     * Represents a character cell in the terminal screen
-     */
-    public static class Glyph {
-        private final char character;
-        private final Color foreground;
-        private final Color background;
-
-        public Glyph(char character, Color foreground, Color background) {
-            this.character = character;
-            this.foreground = foreground;
-            this.background = background;
-        }
-
-        // Pre-defined glyphs
-        public static final Glyph PLAYER = new Glyph('@', Color.WHITE, Color.BLACK);
-        public static final Glyph WALL = new Glyph('#', Color.LIGHT_GRAY, Color.BLACK);
-        public static final Glyph SPACE = new Glyph('.', Color.DARK_GRAY, Color.BLACK);
-    }
-
-    // Font management
+    // Font
     private Font font;
-    private final Map<String, Font> fontCache = new HashMap<>();
 
     // Screen dimensions
     private final Size screenSize = new Size();
@@ -90,22 +67,7 @@ public class TermScreen {
      * @throws RuntimeException if font loading fails
      */
     public TermScreen setFont(String fontPath, float size) {
-        // Try to get from cache first
-        String cacheKey = fontPath + "_" + size;
-        if (fontCache.containsKey(cacheKey)) {
-            font = fontCache.get(cacheKey);
-        } else {
-            // Load the font
-            File fontFile = new File(fontPath);
-            try {
-                font = Font.createFont(Font.TRUETYPE_FONT, fontFile);
-                font = font.deriveFont(Font.PLAIN, size);
-                fontCache.put(cacheKey, font);
-            } catch (FontFormatException | IOException e) {
-                throw new RuntimeException("Failed to load font: " + fontPath, e);
-            }
-        }
-
+        font = FontManager.getFont(fontPath, size);
         calculateCellSize();
         return this;
     }
@@ -114,6 +76,11 @@ public class TermScreen {
      * Calculates the cell size based on font metrics.
      */
     private void calculateCellSize() {
+        if (font == null) {
+            LOGGER.warning("Cannot calculate cell size: font not set");
+            return;
+        }
+
         JComponent dummyComponent = new JComponent() {};
         FontMetrics metrics = dummyComponent.getFontMetrics(this.font);
 
@@ -165,6 +132,11 @@ public class TermScreen {
     }
 
     private void calculateScreenDimensions() {
+        if (cellSize.getWidth() <= 0 || cellSize.getHeight() <= 0) {
+            LOGGER.warning("Cannot calculate screen dimensions: invalid cell size");
+            return;
+        }
+
         int cols = (screenSize.getWidth() - screenInnerPadding.getHorizontal() * 2) / cellSize.getWidth();
         int rows = (screenSize.getHeight() - screenInnerPadding.getVertical() * 2) / cellSize.getHeight();
         dimension.set(cols, rows);
@@ -278,17 +250,23 @@ public class TermScreen {
         }
 
         g.setFont(font);
-        buffer.withReadLock(() -> {
-            Dimension bufferDim = buffer.getDimension();
-            for (int row = 0; row < bufferDim.getRows(); row++) {
-                for (int col = 0; col < bufferDim.getCols(); col++) {
-                    Glyph glyph = buffer.getGlyph(row, col);
-                    if (glyph == null) continue;
+        buffer.withReadLock(() -> renderBuffer(g));
+    }
 
-                    renderGlyph(g, glyph, row, col);
-                }
+    /**
+     * Renders the entire buffer using the provided graphics context.
+     * @param g the graphics context to render to
+     */
+    private void renderBuffer(Graphics2D g) {
+        Dimension bufferDim = buffer.getDimension();
+        for (int row = 0; row < bufferDim.getRows(); row++) {
+            for (int col = 0; col < bufferDim.getCols(); col++) {
+                Glyph glyph = buffer.getGlyph(row, col);
+                if (glyph == null) continue;
+
+                renderGlyph(g, glyph, row, col);
             }
-        });
+        }
     }
 
     /**
@@ -299,31 +277,51 @@ public class TermScreen {
      * @param col the column index
      */
     private void renderGlyph(Graphics2D g, Glyph glyph, int row, int col) {
-        String charString = String.valueOf(glyph.character);
+        String charString = String.valueOf(glyph.getCharacter());
 
         FontMetrics metrics = g.getFontMetrics(font);
         int charWidth = metrics.stringWidth(charString);
         int charHeight = metrics.getHeight();
 
-        float charX = screenPadding.getHorizontal() +
+        // Calculate the position to center the character in its cell
+        float charX = calculateGlyphX(col, charWidth);
+        float charY = calculateGlyphY(row, charHeight, metrics);
+
+        // Draw background if needed
+        if (glyph.getBackground() != null && !glyph.getBackground().equals(Color.BLACK)) {
+            g.setColor(glyph.getBackground());
+            g.fillRect(
+                screenPadding.getHorizontal() + screenInnerPadding.getHorizontal() + col * cellSize.getWidth(),
+                screenPadding.getVertical() + screenInnerPadding.getVertical() + row * cellSize.getHeight(),
+                cellSize.getWidth(),
+                cellSize.getHeight()
+            );
+        }
+
+        g.setColor(glyph.getForeground());
+        g.drawString(charString, charX, charY);
+    }
+
+    /**
+     * Calculates the X coordinate for a glyph.
+     */
+    private float calculateGlyphX(int col, int charWidth) {
+        return screenPadding.getHorizontal() +
                 screenInnerPadding.getHorizontal() +
                 col * cellSize.getWidth() +
                 cellSize.getWidth() / 2f -
                 charWidth / 2f;
+    }
 
-        float charY = screenPadding.getVertical() +
+    /**
+     * Calculates the Y coordinate for a glyph.
+     */
+    private float calculateGlyphY(int row, int charHeight, FontMetrics metrics) {
+        return screenPadding.getVertical() +
                 screenInnerPadding.getVertical() +
-                cellSize.getHeight() +
                 row * cellSize.getHeight() +
-                cellSize.getHeight() / 2f -
-                charHeight / 2f;
-
-        // Optional: Draw background if needed
-        // g.setColor(glyph.background);
-        // g.fillRect(...);
-
-        g.setColor(glyph.foreground);
-        g.drawString(charString, charX, charY);
+                (cellSize.getHeight() - metrics.getDescent()) / 2f +
+                metrics.getAscent() / 2f;
     }
 
     /**

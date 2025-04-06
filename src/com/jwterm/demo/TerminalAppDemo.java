@@ -1,7 +1,7 @@
 package com.jwterm.demo;
 
 import com.jwterm.JWTerm;
-import com.jwterm.TermScreen;
+import com.jwterm.glyph.Glyph;
 import com.jwterm.utils.LoggingUtility;
 
 import java.awt.*;
@@ -17,10 +17,10 @@ public class TerminalAppDemo extends JWTerm {
     private long resizeMessageTime = 0;
     private static final long RESIZE_MESSAGE_DURATION = 3000; // 3 seconds
 
-    private static final TermScreen.Glyph topLeftCorner = new TermScreen.Glyph('╔', Color.CYAN, Color.BLACK);
-    private static final TermScreen.Glyph topRightCorner = new TermScreen.Glyph('╗', Color.CYAN, Color.BLACK);
-    private static final TermScreen.Glyph bottomLeftCorner = new TermScreen.Glyph('╚', Color.CYAN, Color.BLACK);
-    private static final TermScreen.Glyph bottomRightCorner = new TermScreen.Glyph('╝', Color.CYAN, Color.BLACK);
+    private static final Glyph topLeftCorner = new Glyph('╔', Color.CYAN, Color.BLACK);
+    private static final Glyph topRightCorner = new Glyph('╗', Color.CYAN, Color.BLACK);
+    private static final Glyph bottomLeftCorner = new Glyph('╚', Color.CYAN, Color.BLACK);
+    private static final Glyph bottomRightCorner = new Glyph('╝', Color.CYAN, Color.BLACK);
 
     public TerminalAppDemo() {
         super("JWTerm Demo", 1280, 720);
@@ -50,14 +50,16 @@ public class TerminalAppDemo extends JWTerm {
         // Update your application logic here
 
         // Example: fill space and draw border
-        termScreen.fill(TermScreen.Glyph.SPACE);
-        termScreen.outline(TermScreen.Glyph.WALL);
+        termScreen.fill(Glyph.SPACE);
+        termScreen.outline(Glyph.WALL);
 
         // Example: Add characters at the corners
         termScreen.setGlyph(0, 0, topLeftCorner);
         termScreen.setGlyph(0, termScreen.getDimension().getCols() - 1, topRightCorner);
         termScreen.setGlyph(termScreen.getDimension().getRows() - 1, 0, bottomLeftCorner);
         termScreen.setGlyph(termScreen.getDimension().getRows() - 1, termScreen.getDimension().getCols() - 1, bottomRightCorner);
+
+        termScreen.setGlyph(10, 10, new Glyph('@', Color.RED, Color.BLUE));
 
         // Clear resize message after duration
         if (drawResizeInfo && System.currentTimeMillis() - resizeMessageTime > RESIZE_MESSAGE_DURATION) {
@@ -103,7 +105,7 @@ public class TerminalAppDemo extends JWTerm {
 
         if (isCtrlDown(modifiers) && isShiftDown(modifiers) && keyCode == KeyEvent.VK_B) {
             LOGGER.info("Ctrl+Shift+B: Filling screen with walls");
-            termScreen.fill(TermScreen.Glyph.WALL);
+            termScreen.fill(Glyph.WALL);
         }
 
         if (e.getKeyCode() == KeyEvent.VK_F5) {

@@ -1,7 +1,7 @@
 package com.jwterm.buffer;
 
-import com.jwterm.TermScreen.Glyph;
-import com.jwterm.utils.Dimension;
+import com.jwterm.geometry.Dimension;
+import com.jwterm.glyph.Glyph;
 import com.jwterm.utils.LoggingUtility;
 
 import java.util.concurrent.locks.ReadWriteLock;
