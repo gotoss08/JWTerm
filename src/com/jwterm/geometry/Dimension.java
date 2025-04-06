@@ -1,4 +1,4 @@
-package com.jwterm.utils;
+package com.jwterm.geometry;
 
 import java.util.Objects;
 
