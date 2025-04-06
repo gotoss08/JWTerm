@@ -22,6 +22,9 @@ public class TerminalAppDemo extends JWTerm {
     private static final Glyph bottomLeftCorner = new Glyph('╚', Color.CYAN, Color.BLACK);
     private static final Glyph bottomRightCorner = new Glyph('╝', Color.CYAN, Color.BLACK);
 
+    private int glyphX = 10;
+    private int glyphY = 10;
+
     public TerminalAppDemo() {
         super("JWTerm Demo", 1280, 720);
         LoggingUtility.setLogLevel(Level.INFO);
@@ -59,7 +62,7 @@ public class TerminalAppDemo extends JWTerm {
         termScreen.setGlyph(termScreen.getDimension().getRows() - 1, 0, bottomLeftCorner);
         termScreen.setGlyph(termScreen.getDimension().getRows() - 1, termScreen.getDimension().getCols() - 1, bottomRightCorner);
 
-        termScreen.setGlyph(10, 10, new Glyph('@', Color.RED, Color.BLUE));
+        termScreen.setGlyph(glyphY, glyphX, new Glyph('@', Color.RED, Color.BLUE));
 
         // Clear resize message after duration
         if (drawResizeInfo && System.currentTimeMillis() - resizeMessageTime > RESIZE_MESSAGE_DURATION) {
@@ -113,6 +116,17 @@ public class TerminalAppDemo extends JWTerm {
             LOGGER.info("F5 pressed, forcing resize event");
             forceResize();
         }
+
+        if (keyCode == KeyEvent.VK_UP) {
+            glyphY = Math.max(0, glyphY - 1);
+        } else if (keyCode == KeyEvent.VK_DOWN) {
+            glyphY = Math.min(termScreen.getDimension().getRows() - 1, glyphY + 1);
+        } else if (keyCode == KeyEvent.VK_LEFT) {
+            glyphX = Math.max(0, glyphX - 1);
+        } else if (keyCode == KeyEvent.VK_RIGHT) {
+            glyphX = Math.min(termScreen.getDimension().getCols() - 1, glyphX + 1);
+        }
+
     }
 
     @Override
