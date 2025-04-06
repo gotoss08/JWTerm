@@ -349,6 +349,18 @@ public abstract class JWTerm implements KeyListener {
         System.exit(0);
     }
 
+    protected boolean isCtrlDown(int modifiers) {
+        return (modifiers & KeyEvent.CTRL_DOWN_MASK) == KeyEvent.CTRL_DOWN_MASK;
+    }
+
+    protected boolean isAltDown(int modifiers) {
+        return (modifiers & KeyEvent.ALT_DOWN_MASK) == KeyEvent.ALT_DOWN_MASK;
+    }
+
+    protected boolean isShiftDown(int modifiers) {
+        return (modifiers & KeyEvent.SHIFT_DOWN_MASK) == KeyEvent.SHIFT_DOWN_MASK;
+    }
+
     /**
      * Updates the game state.
      * Must be implemented by subclasses.
