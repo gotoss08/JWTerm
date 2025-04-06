@@ -67,6 +67,7 @@ public abstract class JWTerm implements KeyListener, ResizeListener {
         // Initialize UI components
         frame = createFrame(title);
         canvas = createCanvas(windowWidth, windowHeight);
+        canvas.requestFocusInWindow();
         frame.add(canvas);
         frame.pack();
 
@@ -278,6 +279,9 @@ public abstract class JWTerm implements KeyListener, ResizeListener {
         long fpsTimer = System.nanoTime();
 
         while (running) {
+
+            canvas.requestFocusInWindow();
+
             // Calculate delta time
             long currentTime = System.nanoTime();
             double deltaTimeSeconds = (currentTime - lastUpdateTime) / 1_000_000_000.0;
