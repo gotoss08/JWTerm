@@ -5,6 +5,8 @@ import com.jwterm.TermScreen;
 import java.awt.*;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -23,6 +25,7 @@ public class ResizeManager {
     private final TermScreen termScreen;
     private final ScheduledExecutorService executor;
     private ScheduledFuture<?> scheduledResize;
+    private final List<ResizeListener> listeners = new ArrayList<>();
     
     /**
      * Creates a new resize manager for the given component and terminal screen.
@@ -91,6 +94,48 @@ public class ResizeManager {
                 LOGGER.fine("Resized to: " + width + "x" + height);
             });
         }
+        
+        // Notify all registered listeners
+        notifyListeners(width, height);
+    }
+    
+    /**
+     * Notifies all registered listeners about the resize event.
+     * 
+     * @param width New width
+     * @param height New height
+     */
+    private void notifyListeners(int width, int height) {
+        for (ResizeListener listener : listeners) {
+            try {
+                listener.onResize(width, height);
+            } catch (Exception e) {
+                LOGGER.warning("Error notifying resize listener: " + e.getMessage());
+            }
+        }
+    }
+    
+    /**
+     * Registers a resize listener.
+     * 
+     * @param listener The listener to register
+     * @return This ResizeManager instance for chaining
+     */
+    public ResizeManager addListener(ResizeListener listener) {
+        if (listener != null && !listeners.contains(listener)) {
+            listeners.add(listener);
+        }
+        return this;
+    }
+    
+    /**
+     * Removes a resize listener.
+     * 
+     * @param listener The listener to remove
+     * @return true if the listener was removed, false otherwise
+     */
+    public boolean removeListener(ResizeListener listener) {
+        return listeners.remove(listener);
     }
     
     /**
@@ -120,4 +165,3 @@ public class ResizeManager {
         }
     }
 }
-

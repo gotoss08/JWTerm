@@ -1,6 +1,7 @@
 package com.jwterm;
 
 import com.jwterm.utils.LoggingUtility;
+import com.jwterm.utils.ResizeListener;
 import com.jwterm.utils.ResizeManager;
 import com.jwterm.utils.Timer;
 
@@ -17,7 +18,7 @@ import java.util.logging.Logger;
  * Abstract base class for terminal-based applications.
  * Handles window management, rendering, and game loop timing.
  */
-public abstract class JWTerm implements KeyListener {
+public abstract class JWTerm implements KeyListener, ResizeListener {
 
     private static final Logger LOGGER = LoggingUtility.getLogger(JWTerm.class.getName());
     private static final int BUFFER_STRATEGY_COUNT = 2;
@@ -37,7 +38,7 @@ public abstract class JWTerm implements KeyListener {
     // State and configuration
     protected volatile boolean running = true;
     private boolean showDebug = BuildConfig.showDebug;
-    private Font debugFont;
+    private final Font debugFont;
 
     // Performance metrics
     private final Timer updateTimer = new Timer();
@@ -67,9 +68,12 @@ public abstract class JWTerm implements KeyListener {
 
         // Initialize terminal
         termScreen = createTerminalEmulator();
-        
+
         // Initialize resize manager
         resizeManager = new ResizeManager(canvas, termScreen);
+
+        // Register this class as the primary resize listener
+        resizeManager.addListener(this);
 
         // Display the window
         frame.setLocationRelativeTo(null);
@@ -186,9 +190,37 @@ public abstract class JWTerm implements KeyListener {
                 .setInnerPadding(10)
                 .setFont("FSEX302.ttf", 25f)
                 .setScreenSize(canvas.getWidth(), canvas.getHeight())
-                .build()
-                .fill(TermScreen.Glyph.SPACE)
-                .outline(TermScreen.Glyph.WALL);
+                .build();
+    }
+
+    /**
+     * Adds a resize listener that will be notified when the window is resized.
+     * The listener's onResize method will be called after the terminal has been resized.
+     *
+     * @param listener The listener to add
+     * @return This JWTerm instance for chaining
+     */
+    public JWTerm addResizeListener(ResizeListener listener) {
+        resizeManager.addListener(listener);
+        return this;
+    }
+
+    /**
+     * Removes a previously added resize listener.
+     *
+     * @param listener The listener to remove
+     * @return true if the listener was found and removed, false otherwise
+     */
+    public boolean removeResizeListener(ResizeListener listener) {
+        return resizeManager.removeListener(listener);
+    }
+
+    /**
+     * Forces an immediate resize event, useful when you want to trigger
+     * resize handling programmatically.
+     */
+    public void forceResize() {
+        resizeManager.forceResize();
     }
 
     /**
@@ -341,6 +373,31 @@ public abstract class JWTerm implements KeyListener {
     }
 
     /**
+     * Called when the window is resized.
+     * This method is part of the ResizeListener interface.
+     * The JWTerm base class handles basic resize operations, but
+     * subclasses should override this to handle application-specific resize logic.
+     *
+     * @param width The new width in pixels
+     * @param height The new height in pixels
+     */
+    @Override
+    public void onResize(int width, int height) {
+        LOGGER.fine("Base onResize called: " + width + "x" + height);
+        // Subclasses should implement `resize` method to handle application-specific resize logic
+        resize(width, height);
+    }
+
+    /**
+     * Abstract method that subclasses must implement to handle application-specific resize operations.
+     * This is called after the base class has handled the resize event.
+     *
+     * @param width The new width in pixels
+     * @param height The new height in pixels
+     */
+    protected abstract void resize(int width, int height);
+
+    /**
      * Updates the game state.
      * Must be implemented by subclasses.
      *
@@ -357,3 +414,4 @@ public abstract class JWTerm implements KeyListener {
      */
     protected abstract void render(Graphics2D g, double deltaTime);
 }
+
