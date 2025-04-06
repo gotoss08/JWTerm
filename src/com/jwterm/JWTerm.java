@@ -206,10 +206,15 @@ public abstract class JWTerm implements KeyListener {
         }
 
         if (termScreen != null) {
-            termScreen.setScreenSize(width, height)
-                    .recalculateScreenDimensions()
-                    .fill(TermScreen.Glyph.SPACE)
-                    .outline(TermScreen.Glyph.WALL);
+            termScreen.lock.writeLock().lock();
+            try {
+                termScreen.setScreenSize(width, height)
+                        .recalculateScreenDimensions()
+                        .fill(TermScreen.Glyph.SPACE)
+                        .outline(TermScreen.Glyph.WALL);
+            } finally {
+                termScreen.lock.writeLock().unlock();
+            }
         }
 
         LOGGER.fine("Resized to: " + width + "x" + height);

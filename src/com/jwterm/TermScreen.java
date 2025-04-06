@@ -11,6 +11,8 @@ import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -50,7 +52,8 @@ public class TermScreen {
     private final Padding screenPadding = new Padding();
 
     // Screen content
-    private volatile Glyph[][] glyphs;
+    private Glyph[][] glyphs;
+    public final ReadWriteLock lock = new ReentrantReadWriteLock();
 
     /**
      * Creates a new TermScreen with default settings.
@@ -245,13 +248,18 @@ public class TermScreen {
         }
 
         g.setFont(font);
-        for (int row = 0; row < dimension.getRows(); row++) {
-            for (int col = 0; col < dimension.getCols(); col++) {
-                Glyph glyph = glyphs[row][col];
-                if (glyph == null) continue;
+        lock.readLock().lock();
+        try {
+            for (int row = 0; row < dimension.getRows(); row++) {
+                for (int col = 0; col < dimension.getCols(); col++) {
+                    Glyph glyph = glyphs[row][col];
+                    if (glyph == null) continue;
 
-                renderGlyph(g, glyph, row, col);
+                    renderGlyph(g, glyph, row, col);
+                }
             }
+        } finally {
+            lock.readLock().unlock();
         }
     }
 
