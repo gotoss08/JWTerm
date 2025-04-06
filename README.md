@@ -12,17 +12,17 @@ JWTerm is built on standard Java libraries (**Swing** and **AWT**) without exter
 
 One of the inspirations for JWTerm comes from the **AsciiPanel** project, which provides a simple, efficient way to render text-based panels for roguelike games. You can find more about AsciiPanel [here](https://github.com/trystan/AsciiPanel).
 
-## Implemented Features
+## Features
 
 - **Terminal Screen Emulation**: Grid-based character display with configurable foreground and background colors
 - **Professional Game Loop System**: Fixed-timing game loop targeting 60 FPS with proper delta time calculation
-- **Hardware-accelerated Rendering**: Double-buffered rendering using Java2D with OpenGL support
+- **Hardware-accelerated Rendering**: Double-buffered rendering using Java2D with OpenGL support (maybe added in the future)
 - **Customizable Font System**: Support for loading and caching custom monospace fonts
 - **Input Handling**: Keyboard input processing with modifier key support (Ctrl, Shift combinations)
 - **Debug Overlay**: Togglable performance metrics display (FPS, frame time, update/render timing)
 - **Window Management**: Proper window creation with resize handling and DPI scaling awareness
 - **Logging System**: Comprehensive Java logging with both console and file output
-- **Grid Navigation**: API for positioning and manipulating characters on the screen
+- **Grid Navigation**: API for positioning and manipulating characters on the screen (planned for future versions)
 - **Performance Optimization**: Sleep timing to maintain target framerate while minimizing CPU usage
 - **Fixedsys Font**: Uses the **Fixedsys** font for retro-style text rendering, enhancing the terminal-like experience.
 - **Open Source**: JWTerm is free and open-source under the **MIT License**, allowing modification and redistribution.
