@@ -11,6 +11,12 @@ public class LoggingUtility {
 
     public static ArrayList<Logger> loggers = new ArrayList<>();
 
+    public static void setLogLevel(Level level) {
+        for (Logger logger : loggers) {
+            logger.setLevel(level);
+        }
+    }
+
     public static Logger getLogger(String name) {
 
         Logger logger = Logger.getLogger(name);
@@ -18,7 +24,7 @@ public class LoggingUtility {
         if (loggers.contains(logger)) return logger;
         loggers.add(logger);
 
-        logger.setLevel(Level.SEVERE);
+        logger.setLevel(Level.ALL);
         logger.setUseParentHandlers(false);
 
         // Console handler
