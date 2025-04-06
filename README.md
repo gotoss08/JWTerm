@@ -172,6 +172,8 @@ Contributions are welcome! Feel free to fork the repository, submit issues, and 
 
 > Important: Since this project is still in early development, contributions that help improve stability, features, or documentation are particularly appreciated.
 
+Please refer to the [TODO list](./TODO.md) for tasks that need to be completed or improved.
+
 ## Acknowledgments
 
 - Fixedsys font by [Kika](https://github.com/kika/fixedsys).
