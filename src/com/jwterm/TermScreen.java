@@ -361,8 +361,6 @@ public class TermScreen {
     public TermScreen resize(int width, int height) {
         setScreenSize(width, height);
         recalculateScreenDimensions();
-        fill(Glyph.SPACE);
-        outline(Glyph.WALL);
         return this;
     }
 }
