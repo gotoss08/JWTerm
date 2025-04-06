@@ -20,17 +20,23 @@ import java.util.logging.Logger;
  */
 public abstract class JWTerm implements KeyListener, ResizeListener {
 
+    // Constants
     private static final Logger LOGGER = LoggingUtility.getLogger(JWTerm.class.getName());
     private static final int BUFFER_STRATEGY_COUNT = 2;
     private static final int TARGET_FPS = 60;
     private static final long OPTIMAL_TIME_NS = 1_000_000_000 / TARGET_FPS; // nanoseconds per frame
     private static final long FPS_UPDATE_INTERVAL_NS = 1_000_000_000; // 1 second in nanoseconds
+    private static final String DEFAULT_FONT_PATH = "FSEX302.ttf";
+    private static final float DEBUG_FONT_SIZE = 16.0f;
+    private static final float DEFAULT_TERMINAL_FONT_SIZE = 25.0f;
+    private static final int DEFAULT_TERMINAL_PADDING = 10;
 
     // UI Components
     private final JFrame frame;
     private final Canvas canvas;
     private final BufferStrategy bufferStrategy;
     private final ResizeManager resizeManager;
+    private final Font debugFont;
 
     // Terminal emulation
     protected final TermScreen termScreen;
@@ -38,7 +44,6 @@ public abstract class JWTerm implements KeyListener, ResizeListener {
     // State and configuration
     protected volatile boolean running = true;
     private boolean showDebug = BuildConfig.showDebug;
-    private final Font debugFont;
 
     // Performance metrics
     private final Timer updateTimer = new Timer();
@@ -53,8 +58,11 @@ public abstract class JWTerm implements KeyListener, ResizeListener {
      * @param windowHeight Initial height of the window
      */
     public JWTerm(String title, int windowWidth, int windowHeight) {
-        configureHardwareAcceleration();
-        calculateAndLogDpiScaling();
+        // Configure system properties
+        configureSystemProperties();
+        
+        // Log system information
+        logSystemInformation();
 
         // Initialize UI components
         frame = createFrame(title);
@@ -64,15 +72,13 @@ public abstract class JWTerm implements KeyListener, ResizeListener {
 
         // Initialize rendering
         bufferStrategy = createBufferStrategy();
-        debugFont = loadFont("FSEX302.ttf", 16.0f);
+        debugFont = loadFont(DEFAULT_FONT_PATH, DEBUG_FONT_SIZE);
 
         // Initialize terminal
         termScreen = createTerminalEmulator();
 
         // Initialize resize manager
         resizeManager = new ResizeManager(canvas, termScreen);
-
-        // Register this class as the primary resize listener
         resizeManager.addListener(this);
 
         // Display the window
@@ -80,13 +86,23 @@ public abstract class JWTerm implements KeyListener, ResizeListener {
         frame.setVisible(true);
     }
 
+    //--------------------------------------------------------------------------
+    // Initialization Methods
+    //--------------------------------------------------------------------------
+    
     /**
-     * Enables hardware acceleration for rendering if available.
+     * Configures system properties for rendering optimization.
      */
-    private void configureHardwareAcceleration() {
+    private void configureSystemProperties() {
         // Force hardware acceleration (if available)
-        // This tells the Java2D pipeline to use OpenGL if supported, potentially reducing rendering overhead
         System.setProperty("sun.java2d.opengl", "true");
+    }
+    
+    /**
+     * Logs system information for debugging purposes.
+     */
+    private void logSystemInformation() {
+        calculateAndLogDpiScaling();
     }
 
     /**
@@ -164,6 +180,19 @@ public abstract class JWTerm implements KeyListener, ResizeListener {
     }
 
     /**
+     * Creates and initializes the terminal emulator.
+     *
+     * @return The configured TermScreen
+     */
+    private TermScreen createTerminalEmulator() {
+        return new TermScreen()
+                .setInnerPadding(DEFAULT_TERMINAL_PADDING)
+                .setFont(DEFAULT_FONT_PATH, DEFAULT_TERMINAL_FONT_SIZE)
+                .setScreenSize(canvas.getWidth(), canvas.getHeight())
+                .build();
+    }
+
+    /**
      * Loads a font from a file.
      *
      * @param path Path to the font file
@@ -174,24 +203,20 @@ public abstract class JWTerm implements KeyListener, ResizeListener {
     private Font loadFont(String path, float size) {
         File fontFile = new File(path);
         try {
+            if (!fontFile.exists()) {
+                LOGGER.warning("Font file not found: " + path);
+                return new Font(Font.MONOSPACED, Font.PLAIN, (int)size);
+            }
             return Font.createFont(Font.TRUETYPE_FONT, fontFile).deriveFont(Font.PLAIN, size);
         } catch (FontFormatException | IOException e) {
-            throw new RuntimeException("Failed to load font: " + path, e);
+            LOGGER.log(Level.WARNING, "Failed to load font: " + path + ". Using fallback font.", e);
+            return new Font(Font.MONOSPACED, Font.PLAIN, (int)size);
         }
     }
 
-    /**
-     * Creates and initializes the terminal emulator.
-     *
-     * @return The configured TermScreen
-     */
-    private TermScreen createTerminalEmulator() {
-        return new TermScreen()
-                .setInnerPadding(10)
-                .setFont("FSEX302.ttf", 25f)
-                .setScreenSize(canvas.getWidth(), canvas.getHeight())
-                .build();
-    }
+    //--------------------------------------------------------------------------
+    // Resize Management Methods
+    //--------------------------------------------------------------------------
 
     /**
      * Adds a resize listener that will be notified when the window is resized.
@@ -224,6 +249,26 @@ public abstract class JWTerm implements KeyListener, ResizeListener {
     }
 
     /**
+     * Called when the window is resized.
+     * This method is part of the ResizeListener interface.
+     * The JWTerm base class handles basic resize operations, but
+     * subclasses should override this to handle application-specific resize logic.
+     *
+     * @param width The new width in pixels
+     * @param height The new height in pixels
+     */
+    @Override
+    public void onResize(int width, int height) {
+        LOGGER.fine("Base onResize called: " + width + "x" + height);
+        // Subclasses should implement `resize` method to handle application-specific resize logic
+        resize(width, height);
+    }
+
+    //--------------------------------------------------------------------------
+    // Game Loop and Rendering Methods
+    //--------------------------------------------------------------------------
+
+    /**
      * Runs the main game loop with fixed timing.
      * This will continuously update and render until running is set to false.
      */
@@ -233,9 +278,6 @@ public abstract class JWTerm implements KeyListener, ResizeListener {
         long fpsTimer = System.nanoTime();
 
         while (running) {
-
-//            canvas.requestFocusInWindow();
-
             // Calculate delta time
             long currentTime = System.nanoTime();
             double deltaTimeSeconds = (currentTime - lastUpdateTime) / 1_000_000_000.0;
@@ -291,34 +333,28 @@ public abstract class JWTerm implements KeyListener, ResizeListener {
 
             // Render debug overlay if enabled
             if (showDebug) {
-                g.setFont(debugFont);
-                String debugText = String.format(
-                        "[F1 - hide] fps: %3d | frame: %04d (%.4fms) | update: %.4fms | render: %.4fms",
-                        fps, frameCount, deltaTimeMs, updateTimer.getElapsedTimeMs(), renderTimer.getElapsedTimeMs()
-                );
-                renderDebugText(g, debugText);
+                renderDebugOverlay(g, deltaTimeMs, frameCount);
             }
         } finally {
             g.dispose();
         }
         bufferStrategy.show();
     }
-
+    
     /**
-     * Sleeps the current thread to maintain target framerate.
-     *
-     * @param elapsedTime Elapsed time for the current frame in nanoseconds
+     * Renders the debug information overlay.
+     * 
+     * @param g Graphics context
+     * @param deltaTimeMs Time since last frame in milliseconds
+     * @param frameCount Current frame count
      */
-    private void sleepIfNeeded(long elapsedTime) {
-        long sleepTime = (OPTIMAL_TIME_NS - elapsedTime) / 1_000_000; // convert to milliseconds
-        if (sleepTime > 0) {
-            try {
-                Thread.sleep(sleepTime);
-            } catch (InterruptedException ex) {
-                Thread.currentThread().interrupt();
-                LOGGER.log(Level.WARNING, "Game loop sleep interrupted", ex);
-            }
-        }
+    private void renderDebugOverlay(Graphics2D g, double deltaTimeMs, int frameCount) {
+        g.setFont(debugFont);
+        String debugText = String.format(
+                "[F1 - hide] fps: %3d | frame: %04d (%.4fms) | update: %.4fms | render: %.4fms",
+                fps, frameCount, deltaTimeMs, updateTimer.getElapsedTimeMs(), renderTimer.getElapsedTimeMs()
+        );
+        renderDebugText(g, debugText);
     }
 
     /**
@@ -349,6 +385,57 @@ public abstract class JWTerm implements KeyListener, ResizeListener {
     }
 
     /**
+     * Sleeps the current thread to maintain target framerate.
+     *
+     * @param elapsedTime Elapsed time for the current frame in nanoseconds
+     */
+    private void sleepIfNeeded(long elapsedTime) {
+        long sleepTime = (OPTIMAL_TIME_NS - elapsedTime) / 1_000_000; // convert to milliseconds
+        if (sleepTime > 0) {
+            try {
+                Thread.sleep(sleepTime);
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+                LOGGER.log(Level.WARNING, "Game loop sleep interrupted", ex);
+            }
+        }
+    }
+
+    //--------------------------------------------------------------------------
+    // Utility Methods
+    //--------------------------------------------------------------------------
+    
+    /**
+     * Checks if the Control key is pressed in the given key event modifiers.
+     * 
+     * @param modifiers The key event modifiers
+     * @return True if Control is pressed, false otherwise
+     */
+    protected boolean isCtrlDown(int modifiers) {
+        return (modifiers & KeyEvent.CTRL_DOWN_MASK) == KeyEvent.CTRL_DOWN_MASK;
+    }
+
+    /**
+     * Checks if the Alt key is pressed in the given key event modifiers.
+     * 
+     * @param modifiers The key event modifiers
+     * @return True if Alt is pressed, false otherwise
+     */
+    protected boolean isAltDown(int modifiers) {
+        return (modifiers & KeyEvent.ALT_DOWN_MASK) == KeyEvent.ALT_DOWN_MASK;
+    }
+
+    /**
+     * Checks if the Shift key is pressed in the given key event modifiers.
+     * 
+     * @param modifiers The key event modifiers
+     * @return True if Shift is pressed, false otherwise
+     */
+    protected boolean isShiftDown(int modifiers) {
+        return (modifiers & KeyEvent.SHIFT_DOWN_MASK) == KeyEvent.SHIFT_DOWN_MASK;
+    }
+
+    /**
      * Cleans up resources and exits the application.
      */
     private void shutdown() {
@@ -360,33 +447,9 @@ public abstract class JWTerm implements KeyListener, ResizeListener {
         System.exit(0);
     }
 
-    protected boolean isCtrlDown(int modifiers) {
-        return (modifiers & KeyEvent.CTRL_DOWN_MASK) == KeyEvent.CTRL_DOWN_MASK;
-    }
-
-    protected boolean isAltDown(int modifiers) {
-        return (modifiers & KeyEvent.ALT_DOWN_MASK) == KeyEvent.ALT_DOWN_MASK;
-    }
-
-    protected boolean isShiftDown(int modifiers) {
-        return (modifiers & KeyEvent.SHIFT_DOWN_MASK) == KeyEvent.SHIFT_DOWN_MASK;
-    }
-
-    /**
-     * Called when the window is resized.
-     * This method is part of the ResizeListener interface.
-     * The JWTerm base class handles basic resize operations, but
-     * subclasses should override this to handle application-specific resize logic.
-     *
-     * @param width The new width in pixels
-     * @param height The new height in pixels
-     */
-    @Override
-    public void onResize(int width, int height) {
-        LOGGER.fine("Base onResize called: " + width + "x" + height);
-        // Subclasses should implement `resize` method to handle application-specific resize logic
-        resize(width, height);
-    }
+    //--------------------------------------------------------------------------
+    // Abstract Methods - Must be implemented by subclasses
+    //--------------------------------------------------------------------------
 
     /**
      * Abstract method that subclasses must implement to handle application-specific resize operations.
@@ -414,4 +477,3 @@ public abstract class JWTerm implements KeyListener, ResizeListener {
      */
     protected abstract void render(Graphics2D g, double deltaTime);
 }
-
