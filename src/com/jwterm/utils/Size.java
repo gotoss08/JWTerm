@@ -10,6 +10,10 @@ public class Size {
         this(0);
     }
 
+    public Size(Size size) {
+        this(size.width, size.height);
+    }
+
     public Size(int size) {
         this(size, size);
     }

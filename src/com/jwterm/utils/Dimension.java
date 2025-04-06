@@ -10,6 +10,10 @@ public class Dimension {
         this(0);
     }
 
+    public Dimension(Dimension dimension) {
+        this(dimension.cols, dimension.rows);
+    }
+
     public Dimension(int dimension) {
         this(dimension, dimension);
     }

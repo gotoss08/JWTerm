@@ -10,6 +10,10 @@ public class Padding {
         this(0);
     }
 
+    public Padding(Padding padding) {
+        this(padding.horizontal, padding.vertical);
+    }
+
     public Padding(int padding) {
         this(padding, padding);
     }
