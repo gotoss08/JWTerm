@@ -6,13 +6,19 @@ import com.jwterm.geometry.Dimension;
 import com.jwterm.geometry.Padding;
 import com.jwterm.geometry.Size;
 import com.jwterm.glyph.Glyph;
+import com.jwterm.render.TerminalRenderer;
 import com.jwterm.utils.LoggingUtility;
+import com.jwterm.utils.Timer;
 
 import javax.swing.*;
 import java.awt.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+/**
+ * Manages the terminal screen rendering, dimensions, and buffer operations.
+ * Uses a builder pattern for configuration.
+ */
 public class TermScreen {
 
     private static final Logger LOGGER = LoggingUtility.getLogger(TermScreen.class.getName());
@@ -29,14 +35,46 @@ public class TermScreen {
 
     // Screen content
     private TerminalBuffer buffer;
+    
+    // Renderer
+    private final TerminalRenderer renderer;
+    
+    // Performance tracking
+    private final Timer operationTimer = new Timer();
+    private boolean enablePerformanceTracking = false;
+
+    //--------------------------------------------------------------------------
+    // Constructors
+    //--------------------------------------------------------------------------
 
     /**
      * Creates a new TermScreen with default settings.
      * Use the builder pattern methods to configure and then call build().
      */
     public TermScreen() {
-        // Default constructor for builder pattern
+        this.renderer = new TerminalRenderer();
     }
+    
+    /**
+     * Creates a new TermScreen with the specified configuration.
+     * 
+     * @param fontPath path to the font file
+     * @param fontSize font size
+     * @param innerPadding inner padding in pixels
+     * @param width screen width in pixels
+     * @param height screen height in pixels
+     */
+    public TermScreen(String fontPath, float fontSize, int innerPadding, int width, int height) {
+        this();
+        setFont(fontPath, fontSize);
+        setInnerPadding(innerPadding);
+        setScreenSize(width, height);
+        build();
+    }
+
+    //--------------------------------------------------------------------------
+    // Configuration Methods
+    //--------------------------------------------------------------------------
 
     /**
      * Completes configuration by performing necessary calculations and initializations.
@@ -67,10 +105,44 @@ public class TermScreen {
      * @throws RuntimeException if font loading fails
      */
     public TermScreen setFont(String fontPath, float size) {
+        startTimingOperation("setFont");
         font = FontManager.getFont(fontPath, size);
         calculateCellSize();
+        endTimingOperation("setFont");
         return this;
     }
+
+    /**
+     * Sets the size of the terminal screen in pixels.
+     * @param screenWidth width in pixels
+     * @param screenHeight height in pixels
+     * @return this TermScreen instance for chaining
+     */
+    public TermScreen setScreenSize(int screenWidth, int screenHeight) {
+        if (screenWidth <= 0 || screenHeight <= 0) {
+            LOGGER.warning("Invalid screen dimensions: " + screenWidth + "x" + screenHeight);
+            return this;
+        }
+        
+        screenSize.set(screenWidth, screenHeight);
+        logTerminalScreenSize();
+        return this;
+    }
+    
+    /**
+     * Enables or disables performance tracking for operations.
+     * 
+     * @param enabled true to enable tracking, false to disable
+     * @return this TermScreen instance for chaining
+     */
+    public TermScreen setPerformanceTracking(boolean enabled) {
+        this.enablePerformanceTracking = enabled;
+        return this;
+    }
+
+    //--------------------------------------------------------------------------
+    // Dimension Calculation Methods
+    //--------------------------------------------------------------------------
 
     /**
      * Calculates the cell size based on font metrics.
@@ -93,23 +165,6 @@ public class TermScreen {
     }
 
     /**
-     * Sets the size of the terminal screen in pixels.
-     * @param screenWidth width in pixels
-     * @param screenHeight height in pixels
-     * @return this TermScreen instance for chaining
-     */
-    public TermScreen setScreenSize(int screenWidth, int screenHeight) {
-        if (screenWidth <= 0 || screenHeight <= 0) {
-            LOGGER.warning("Invalid screen dimensions: " + screenWidth + "x" + screenHeight);
-            return this;
-        }
-        
-        screenSize.set(screenWidth, screenHeight);
-        logTerminalScreenSize();
-        return this;
-    }
-
-    /**
      * Recalculates all dimensions based on current settings.
      * This should be called after changing screen size or font.
      * 
@@ -120,9 +175,11 @@ public class TermScreen {
             LOGGER.warning("Cannot recalculate dimensions: font not set");
             return this;
         }
-        
+
+        startTimingOperation("recalculateScreenDimensions");        
         calculateScreenDimensions();
         calculateScreenPadding();
+        endTimingOperation("recalculateScreenDimensions");
         return this;
     }
 
@@ -160,6 +217,10 @@ public class TermScreen {
         screenPadding.setVertical(verticalPadding);
     }
 
+    //--------------------------------------------------------------------------
+    // Buffer Management Methods
+    //--------------------------------------------------------------------------
+
     private void initializeBuffer() {
         if (buffer == null) {
             buffer = new TerminalBuffer(dimension.getRows(), dimension.getCols());
@@ -174,9 +235,11 @@ public class TermScreen {
      * @return this TermScreen instance for chaining
      */
     public TermScreen fill(Glyph glyph) {
+        startTimingOperation("fill");
         if (buffer != null) {
             buffer.fill(glyph);
         }
+        endTimingOperation("fill");
         return this;
     }
 
@@ -186,9 +249,11 @@ public class TermScreen {
      * @return this TermScreen instance for chaining
      */
     public TermScreen outline(Glyph glyph) {
+        startTimingOperation("outline");
         if (buffer != null) {
             buffer.outline(glyph);
         }
+        endTimingOperation("outline");
         return this;
     }
 
@@ -239,6 +304,10 @@ public class TermScreen {
         }
     }
 
+    //--------------------------------------------------------------------------
+    // Rendering Methods
+    //--------------------------------------------------------------------------
+
     /**
      * Renders the terminal screen using the provided graphics context.
      * @param g the graphics context to render to
@@ -249,80 +318,173 @@ public class TermScreen {
             return;
         }
 
+        startTimingOperation("render");
         g.setFont(font);
-        buffer.withReadLock(() -> renderBuffer(g));
+        buffer.withReadLock(() -> {
+            renderer.renderBuffer(g, buffer, font, 
+                    screenPadding, screenInnerPadding, cellSize);
+        });
+        endTimingOperation("render");
     }
 
-    /**
-     * Renders the entire buffer using the provided graphics context.
-     * @param g the graphics context to render to
-     */
-    private void renderBuffer(Graphics2D g) {
-        Dimension bufferDim = buffer.getDimension();
-        for (int row = 0; row < bufferDim.getRows(); row++) {
-            for (int col = 0; col < bufferDim.getCols(); col++) {
-                Glyph glyph = buffer.getGlyph(row, col);
-                if (glyph == null) continue;
-
-                renderGlyph(g, glyph, row, col);
-            }
+    //--------------------------------------------------------------------------
+    // Performance Monitoring Methods
+    //--------------------------------------------------------------------------
+    
+    private void startTimingOperation(String operationName) {
+        if (enablePerformanceTracking) {
+            operationTimer.start();
         }
     }
-
-    /**
-     * Renders a single glyph at the specified position.
-     * @param g the graphics context
-     * @param glyph the glyph to render
-     * @param row the row index
-     * @param col the column index
-     */
-    private void renderGlyph(Graphics2D g, Glyph glyph, int row, int col) {
-        String charString = String.valueOf(glyph.getCharacter());
-
-        FontMetrics metrics = g.getFontMetrics(font);
-        int charWidth = metrics.stringWidth(charString);
-        int charHeight = metrics.getHeight();
-
-        // Calculate the position to center the character in its cell
-        float charX = calculateGlyphX(col, charWidth);
-        float charY = calculateGlyphY(row, charHeight, metrics);
-
-        // Draw background if needed
-        if (glyph.getBackground() != null && !glyph.getBackground().equals(Color.BLACK)) {
-            g.setColor(glyph.getBackground());
-            g.fillRect(
-                screenPadding.getHorizontal() + screenInnerPadding.getHorizontal() + col * cellSize.getWidth(),
-                screenPadding.getVertical() + screenInnerPadding.getVertical() + row * cellSize.getHeight(),
-                cellSize.getWidth(),
-                cellSize.getHeight()
-            );
+    
+    private void endTimingOperation(String operationName) {
+        if (enablePerformanceTracking) {
+            operationTimer.stop();
+            LOGGER.fine(operationName + " took " + operationTimer.getElapsedTimeMs() + "ms");
         }
-
-        g.setColor(glyph.getForeground());
-        g.drawString(charString, charX, charY);
     }
+    
+    /**
+     * Returns performance statistics for the last timed operation.
+     * Only available if performance tracking is enabled.
+     * 
+     * @return a string containing performance information, or null if tracking is disabled
+     */
+    public String getLastOperationStats() {
+        if (!enablePerformanceTracking) {
+            return null;
+        }
+        return String.format("Last operation: %.4f ms", operationTimer.getElapsedTimeMs());
+    }
+    
+    /**
+     * Resets all performance counters.
+     */
+    public void resetPerformanceCounters() {
+        operationTimer.stop(); // Ensure timer is stopped
+    }
+
+    //--------------------------------------------------------------------------
+    // Batch Operations
+    //--------------------------------------------------------------------------
 
     /**
-     * Calculates the X coordinate for a glyph.
+     * Sets multiple glyphs in a batch operation for better performance.
+     * This is more efficient than setting glyphs individually when updating many cells.
+     * 
+     * @param positions array of row/col pairs where even indices are rows and odd indices are columns
+     * @param glyphs array of glyphs to set at the specified positions
+     * @return this TermScreen instance for chaining
+     * @throws IllegalArgumentException if the positions array length is not even or doesn't match glyphs length*2
      */
-    private float calculateGlyphX(int col, int charWidth) {
-        return screenPadding.getHorizontal() +
-                screenInnerPadding.getHorizontal() +
-                col * cellSize.getWidth() +
-                cellSize.getWidth() / 2f -
-                charWidth / 2f;
+    public TermScreen setGlyphsBatch(int[] positions, Glyph[] glyphs) {
+        if (positions.length % 2 != 0) {
+            throw new IllegalArgumentException("Positions array must have an even length");
+        }
+        
+        if (positions.length / 2 != glyphs.length) {
+            throw new IllegalArgumentException("Positions and glyphs arrays must match in length");
+        }
+        
+        startTimingOperation("setGlyphsBatch");
+        if (buffer != null) {
+            buffer.withWriteLock(() -> {
+                for (int i = 0; i < glyphs.length; i++) {
+                    int row = positions[i * 2];
+                    int col = positions[i * 2 + 1];
+                    buffer.setGlyph(row, col, glyphs[i]);
+                }
+            });
+        }
+        endTimingOperation("setGlyphsBatch");
+        return this;
+    }
+    
+    /**
+     * Fills a rectangular area with the specified glyph.
+     * 
+     * @param startRow top row of the rectangle
+     * @param startCol left column of the rectangle
+     * @param endRow bottom row of the rectangle (inclusive)
+     * @param endCol right column of the rectangle (inclusive)
+     * @param glyph the glyph to fill with
+     * @return this TermScreen instance for chaining
+     */
+    public TermScreen fillRect(int startRow, int startCol, int endRow, int endCol, Glyph glyph) {
+        startTimingOperation("fillRect");
+        if (buffer != null) {
+            buffer.withWriteLock(() -> {
+                for (int row = startRow; row <= endRow; row++) {
+                    for (int col = startCol; col <= endCol; col++) {
+                        buffer.setGlyph(row, col, glyph);
+                    }
+                }
+            });
+        }
+        endTimingOperation("fillRect");
+        return this;
+    }
+    
+    /**
+     * Draws a rectangle outline with the specified glyph.
+     * 
+     * @param startRow top row of the rectangle
+     * @param startCol left column of the rectangle
+     * @param endRow bottom row of the rectangle (inclusive)
+     * @param endCol right column of the rectangle (inclusive)
+     * @param glyph the glyph to draw with
+     * @return this TermScreen instance for chaining
+     */
+    public TermScreen drawRect(int startRow, int startCol, int endRow, int endCol, Glyph glyph) {
+        startTimingOperation("drawRect");
+        if (buffer != null) {
+            buffer.withWriteLock(() -> {
+                // Draw horizontal lines
+                for (int col = startCol; col <= endCol; col++) {
+                    buffer.setGlyph(startRow, col, glyph); // Top line
+                    buffer.setGlyph(endRow, col, glyph);   // Bottom line
+                }
+                
+                // Draw vertical lines (skip corners to avoid duplicating them)
+                for (int row = startRow + 1; row < endRow; row++) {
+                    buffer.setGlyph(row, startCol, glyph); // Left line
+                    buffer.setGlyph(row, endCol, glyph);   // Right line
+                }
+            });
+        }
+        endTimingOperation("drawRect");
+        return this;
+    }
+    
+    /**
+     * Writes a string horizontally starting at the specified position.
+     * 
+     * @param row starting row
+     * @param col starting column
+     * @param text the text to write
+     * @param foreground foreground color for the text
+     * @param background background color for the text (can be null for transparent)
+     * @return this TermScreen instance for chaining
+     */
+    public TermScreen writeString(int row, int col, String text, Color foreground, Color background) {
+        startTimingOperation("writeString");
+        if (buffer != null && text != null) {
+            buffer.withWriteLock(() -> {
+                for (int i = 0; i < text.length(); i++) {
+                    if (col + i >= dimension.getCols()) {
+                        break; // Don't write past the right edge
+                    }
+                    buffer.setGlyph(row, col + i, new Glyph(text.charAt(i), foreground, background));
+                }
+            });
+        }
+        endTimingOperation("writeString");
+        return this;
     }
 
-    /**
-     * Calculates the Y coordinate for a glyph.
-     */
-    private float calculateGlyphY(int row, int charHeight, FontMetrics metrics) {
-        return screenPadding.getVertical() +
-                screenInnerPadding.getVertical() +
-                row * cellSize.getHeight() +
-                (cellSize.getHeight() - metrics.getDescent()) / 2f +
-                metrics.getAscent() / 2f;
-    }
+    //--------------------------------------------------------------------------
+    // Getters and Setters
+    //--------------------------------------------------------------------------
 
     /**
      * Gets the screen's inner padding.
@@ -347,6 +509,30 @@ public class TermScreen {
     public Size getScreenSize() {
         return screenSize;
     }
+    
+    /**
+     * Gets the current font.
+     * @return the current font
+     */
+    public Font getFont() {
+        return font;
+    }
+    
+    /**
+     * Gets the cell size.
+     * @return the cell size
+     */
+    public Size getCellSize() {
+        return cellSize;
+    }
+    
+    /**
+     * Gets the screen padding.
+     * @return the screen padding
+     */
+    public Padding getScreenPadding() {
+        return screenPadding;
+    }
 
     /**
      * Resizes the terminal screen to the specified dimensions.
@@ -357,8 +543,15 @@ public class TermScreen {
      * @return this TermScreen instance for chaining
      */
     public TermScreen resize(int width, int height) {
+        if (width <= 0 || height <= 0) {
+            LOGGER.warning("Invalid resize dimensions: " + width + "x" + height);
+            return this;
+        }
+        
+        startTimingOperation("resize");
         setScreenSize(width, height);
         recalculateScreenDimensions();
+        endTimingOperation("resize");
         return this;
     }
 }
