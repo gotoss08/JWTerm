@@ -2,4 +2,8 @@
 
 - [ ] Add debug message queue management and rendering system
 - [ ] Implement TerminalBuffer cache (for performance) ???
-- [ ] Implement cell (glyph) background color
+- [x] Implement cell (glyph) background color
+- [ ] Real time font change and resize
+- [ ] Menu system with realtime configuration
+- [ ] Proper input manager
+- [ ] Debug console
