@@ -2,11 +2,11 @@ package com.jwterm.buffer;
 
 import com.jwterm.TermScreen.Glyph;
 import com.jwterm.utils.Dimension;
+import com.jwterm.utils.LoggingUtility;
 
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.logging.Logger;
-import com.jwterm.utils.LoggingUtility;
 
 /**
  * Manages the terminal screen buffer with thread-safe operations.
